@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { useStore } from "@/lib/store"
 import type { Ebook } from "@/lib/types"
 import { ArrowLeft, BookOpen, User, Mail, Phone } from "lucide-react"
-import { formatPriceFull } from "@/lib/currency"
 
 export default function AcheterEbookPage() {
   const router = useRouter()
@@ -261,7 +260,7 @@ export default function AcheterEbookPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>E-book</span>
-                    <span>{formatPriceFull(ebook.price).fcfa}</span>
+                    <span>{ebook.price.toLocaleString("fr-FR")} FCFA</span>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Livraison</span>
@@ -272,10 +271,10 @@ export default function AcheterEbookPage() {
                 <div className="border-t pt-4">
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span className="text-primary">{formatPriceFull(ebook.price).fcfa}</span>
+                    <span className="text-primary">{ebook.price.toLocaleString("fr-FR")} FCFA</span>
                   </div>
                   <p className="text-xs text-muted-foreground text-right mt-1">
-                    {formatPriceFull(ebook.price).eur}
+                    {ebook.price.toLocaleString("fr-FR")} FCFA
                   </p>
                 </div>
 

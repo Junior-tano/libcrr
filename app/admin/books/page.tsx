@@ -65,15 +65,14 @@ export default function AdminBooksPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const priceInFcfa = parseFloat(formData.price as string) || 0
-    const priceInEur  = priceInFcfa / 655.957
+    const price = parseFloat(formData.price as string) || 0
 
     const bookData = {
       title:      formData.title,
       description:formData.description,
       author:     formData.author,
       coverImage: formData.coverImage || "/images/book-default.jpg",
-      price:      priceInEur,
+      price:      price,
       stock:      parseInt(formData.stock as string) || 0,
     }
 
@@ -88,13 +87,12 @@ export default function AdminBooksPage() {
 
   const handleEdit = (book: PhysicalBook) => {
     setEditingBook(book)
-    const priceInFcfa = Math.round(book.price * 655.957)
     setFormData({
       title:      book.title,
       description:book.description,
       author:     book.author,
       coverImage: book.coverImage,
-      price:      priceInFcfa.toString(),
+      price:      (book.price || 0).toString(),
       stock:      book.stock.toString(),
     })
     setIsSheetOpen(true)
@@ -318,7 +316,7 @@ export default function AdminBooksPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
-                        {formatPriceFull(book.price).fcfa}
+                        {book.price.toLocaleString("fr-FR")} FCFA
                       </Badge>
                       <Badge
                         variant="outline"

@@ -6,15 +6,17 @@ export const EUR_TO_XOF_RATE = 655.957
 /**
  * Convertit un montant EUR en XOF
  */
-export function eurToXof(eurAmount: number): number {
-  return Math.round(eurAmount * EUR_TO_XOF_RATE)
+export function eurToXof(eurAmount: number | string): number {
+  const num = typeof eurAmount === "string" ? parseFloat(eurAmount) : eurAmount
+  return Math.round(num * EUR_TO_XOF_RATE)
 }
 
 /**
  * Convertit un montant XOF en EUR
  */
-export function xofToEur(xofAmount: number): number {
-  return xofAmount / EUR_TO_XOF_RATE
+export function xofToEur(xofAmount: number | string): number {
+  const num = typeof xofAmount === "string" ? parseFloat(xofAmount) : xofAmount
+  return num / EUR_TO_XOF_RATE
 }
 
 /**
@@ -22,30 +24,33 @@ export function xofToEur(xofAmount: number): number {
  * - Benin: Affiche en FCFA uniquement
  * - France: Affiche en EUR avec equivalent FCFA
  */
-export function formatPrice(amount: number, country: "france" | "benin" = "benin"): string {
-  const xofAmount = eurToXof(amount)
-  
+export function formatPrice(amount: number | string, country: "france" | "benin" = "benin"): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  const xofAmount = eurToXof(num)
+
   if (country === "benin") {
     return `${xofAmount.toLocaleString('fr-FR')} FCFA`
   } else {
     // France: EUR + equivalent FCFA
-    return `${amount.toFixed(2)} EUR (${xofAmount.toLocaleString('fr-FR')} FCFA)`
+    return `${num.toFixed(2)} EUR (${xofAmount.toLocaleString('fr-FR')} FCFA)`
   }
 }
 
 /**
  * Formate un montant en FCFA uniquement
  */
-export function formatFCFA(amount: number): string {
-  const xofAmount = eurToXof(amount)
+export function formatFCFA(amount: number | string): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  const xofAmount = eurToXof(num)
   return `${xofAmount.toLocaleString('fr-FR')} FCFA`
 }
 
 /**
  * Formate un montant en EUR uniquement
  */
-export function formatEUR(amount: number): string {
-  return `${amount.toFixed(2)} EUR`
+export function formatEUR(amount: number | string): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  return `${num.toFixed(2)} EUR`
 }
 
 /**
@@ -53,22 +58,24 @@ export function formatEUR(amount: number): string {
  * - Benin: FCFA
  * - France: EUR
  */
-export function formatPriceShort(amount: number, country: "france" | "benin" = "benin"): string {
+export function formatPriceShort(amount: number | string, country: "france" | "benin" = "benin"): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount
   if (country === "benin") {
-    const xofAmount = eurToXof(amount)
+    const xofAmount = eurToXof(num)
     return `${xofAmount.toLocaleString('fr-FR')} FCFA`
   } else {
-    return `${amount.toFixed(2)} EUR`
+    return `${num.toFixed(2)} EUR`
   }
 }
 
 /**
  * Affiche le prix complet avec les deux devises
  */
-export function formatPriceFull(amount: number): { eur: string; fcfa: string } {
-  const xofAmount = eurToXof(amount)
+export function formatPriceFull(amount: number | string): { eur: string; fcfa: string } {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount
+  const xofAmount = eurToXof(num)
   return {
-    eur: `${amount.toFixed(2)} EUR`,
+    eur: `${num.toFixed(2)} EUR`,
     fcfa: `${xofAmount.toLocaleString('fr-FR')} FCFA`
   }
 }

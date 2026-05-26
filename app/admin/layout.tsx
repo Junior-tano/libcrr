@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -31,7 +31,11 @@ import {
   CheckCheck,
   Trash2,
   Calendar,
-  Image
+  Image,
+  Shield,
+  ExternalLink,
+  Pencil,
+  Upload
 } from "lucide-react"
 
 const navigation = [
@@ -55,6 +59,8 @@ export default function AdminLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string>("")
+  const logoInputRef = useRef<HTMLInputElement>(null)
   
   const { 
     isAdminAuthenticated, 
@@ -72,6 +78,8 @@ export default function AdminLayout({
   useEffect(() => {
     setMounted(true)
     loadApiData()
+    const saved = localStorage.getItem("admin-site-logo")
+    if (saved) setLogoUrl(saved)
   }, [loadApiData])
 
   // Don't render until mounted to avoid hydration issues
@@ -93,6 +101,19 @@ export default function AdminLayout({
   const handleLogout = () => {
     logout()
     router.push("/admin/login")
+  }
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64 = reader.result as string
+      setLogoUrl(base64)
+      localStorage.setItem("admin-site-logo", base64)
+    }
+    reader.readAsDataURL(file)
+    if (logoInputRef.current) logoInputRef.current.value = ""
   }
 
   const handleNotificationClick = (notificationId: string, orderId?: string) => {
@@ -120,10 +141,14 @@ export default function AdminLayout({
         )}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">CCR</span>
-            </div>
+          <Link href="/admin" className="flex items-center gap-3">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="w-14 h-14 rounded-xl object-cover border border-sidebar-border/50" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-lg">CCR</span>
+              </div>
+            )}
             <span className="font-semibold text-sm">Administration</span>
           </Link>
           <Button
@@ -134,6 +159,21 @@ export default function AdminLayout({
           >
             <X className="h-5 w-5" />
           </Button>
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            title="Changer le logo"
+            className="p-1.5 rounded-lg text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <input
+            type="file"
+            ref={logoInputRef}
+            onChange={handleLogoUpload}
+            accept="image/*"
+            className="hidden"
+          />
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -164,24 +204,10 @@ export default function AdminLayout({
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border space-y-2">
+        <div className="p-4 border-t border-sidebar-border">
           <div className="px-3 py-2 text-xs text-sidebar-foreground/60">
             Connecte: {adminEmail}
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors w-full"
-          >
-            <LogOut className="h-5 w-5" />
-            Deconnexion
-          </button>
-          <Link
-            href="/"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-          >
-            <Book className="h-5 w-5" />
-            Voir le site
-          </Link>
         </div>
       </aside>
 
@@ -277,12 +303,69 @@ export default function AdminLayout({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-xs font-medium">AD</span>
-            </div>
-            <span className="text-sm font-medium hidden sm:block">Admin</span>
-          </div>
+          {/* Admin Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-accent">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <span className="text-primary-foreground text-xs font-medium">
+                      {adminEmail?.slice(0, 2).toUpperCase() || "AD"}
+                    </span>
+                  </div>
+                )}
+                <span className="text-sm font-medium hidden sm:block">Admin</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex items-center gap-3">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-9 h-9 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
+                      <span className="text-primary-foreground text-sm font-medium">
+                        {adminEmail?.slice(0, 2).toUpperCase() || "AD"}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">Admin</span>
+                    <span className="text-xs text-muted-foreground truncate max-w-[140px]">{adminEmail}</span>
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="cursor-pointer">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Parametres du compte
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="cursor-pointer">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Parametres de securite
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/" className="cursor-pointer">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Voir le site
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Se deconnecter
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
 
         {/* Page content */}

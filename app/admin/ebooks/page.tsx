@@ -75,15 +75,14 @@ export default function AdminEbooksPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const priceInFcfa = parseFloat(formData.price as string) || 0
-    const priceInEur  = formData.isFree ? 0 : priceInFcfa / 655.957
+    const price = formData.isFree ? 0 : parseFloat(formData.price as string) || 0
 
     const ebookData = {
       title:      formData.title,
       description:formData.description,
       author:     formData.author,
       coverImage: formData.coverImage || "/images/ebook-default.jpg",
-      price:      priceInEur,
+      price:      price,
       isFree:     formData.isFree,
       pdfUrl:     formData.pdfUrl,
     }
@@ -99,13 +98,12 @@ export default function AdminEbooksPage() {
 
   const handleEdit = (ebook: Ebook) => {
     setEditingEbook(ebook)
-    const priceInFcfa = Math.round(ebook.price * 655.957)
     setFormData({
       title:      ebook.title,
       description:ebook.description,
       author:     ebook.author,
       coverImage: ebook.coverImage,
-      price:      ebook.isFree ? "" : priceInFcfa.toString(),
+      price:      ebook.isFree ? "" : (ebook.price || 0).toString(),
       isFree:     ebook.isFree,
       pdfUrl:     ebook.pdfUrl ?? "",
     })
@@ -360,7 +358,7 @@ export default function AdminEbooksPage() {
                         <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">Gratuit</Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20">
-                          {formatPriceFull(ebook.price).fcfa}
+                          {ebook.price.toLocaleString("fr-FR")} FCFA
                         </Badge>
                       )}
                       <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">PDF</Badge>

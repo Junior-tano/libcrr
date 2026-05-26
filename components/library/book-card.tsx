@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { PhysicalBook, Ebook } from "@/lib/types"
 import { ShoppingCart, Download, BookOpen, Share2 } from "lucide-react"
-import { formatFCFA } from "@/lib/currency"
 import { useToast } from "@/hooks/use-toast"
 import { useAuthModal } from "@/components/library/auth-modal"
 
@@ -134,7 +133,7 @@ export function BookCard({ book, type }: BookCardProps) {
                 onClick={handleBuyClick}
               >
                 <ShoppingCart className="h-3 w-3 mr-1.5" />
-                {formatFCFA(book.price)}
+                {book.price.toLocaleString("fr-FR")} FCFA
               </Button>
             )
           ) : (
