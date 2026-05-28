@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useStore } from "@/lib/store"
+import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -36,11 +37,11 @@ import {
   HelpCircle,
   User,
   Clock,
+  Loader2,
 } from "lucide-react"
 import type { Podcast } from "@/lib/types"
 import { podcastThemes } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
-import { fileToBase64 } from "@/lib/image-utils"
 
 const themeColors: Record<string, string> = {
   foi:        "bg-blue-500/10 text-blue-600 border-blue-500/20",
@@ -52,12 +53,20 @@ const themeColors: Record<string, string> = {
 export default function AdminPodcastsPage() {
   const { podcasts, addPodcast, updatePodcast, deletePodcast } = useStore()
 
-  const [isSheetOpen, setIsSheetOpen]       = useState(false)
-  const [editingPodcast, setEditingPodcast]  = useState<Podcast | null>(null)
+  const [isSheetOpen, setIsSheetOpen]           = useState(false)
+  const [editingPodcast, setEditingPodcast]      = useState<Podcast | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [podcastToDelete, setPodcastToDelete]   = useState<Podcast | null>(null)
-  const [audioFile, setAudioFile]           = useState<File | null>(null)
-  const [coverFile, setCoverFile]           = useState<File | null>(null)
+
+  // Fichiers locaux sélectionnés (avant upload)
+  const [audioFile, setAudioFile]   = useState<File | null>(null)
+  const [coverFile, setCoverFile]   = useState<File | null>(null)
+
+  // États de chargement pendant l'upload
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false)
+  const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [isSubmitting, setIsSubmitting]         = useState(false)
+  const [uploadError, setUploadError]           = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     title:      "",
@@ -65,8 +74,8 @@ export default function AdminPodcastsPage() {
     speaker:    "",
     duration:   "",
     theme:      "foi" as Podcast["theme"],
-    audioUrl:   "",
-    coverImage: "",
+    audioUrl:   "",   // URL publique retournée par le backend après upload
+    coverImage: "",   // URL publique de la couverture
   })
 
   const resetForm = () => {
@@ -74,48 +83,109 @@ export default function AdminPodcastsPage() {
     setEditingPodcast(null)
     setAudioFile(null)
     setCoverFile(null)
+    setUploadError(null)
+    setIsUploadingAudio(false)
+    setIsUploadingCover(false)
+    setIsSubmitting(false)
   }
 
+  /**
+   * Sélection d'un fichier audio :
+   * On envoie immédiatement le fichier au backend via multipart/form-data
+   * et on stocke l'URL publique retournée dans formData.audioUrl.
+   * On extrait également automatiquement la durée du fichier audio.
+   *
+   * ⚠️  On n'utilise PLUS fileToBase64 pour les audios : un fichier MP3
+   *     de 50 Mo donnerait un base64 de ~67 Mo, ce qui dépasse la limite
+   *     du localStorage (5-10 Mo) et empêche la persistance dans Zustand.
+   */
   const handleAudioFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setAudioFile(file)
-      const base64 = await fileToBase64(file)
-      setFormData(p => ({ ...p, audioUrl: base64 }))
+    if (!file) return
+
+    setAudioFile(file)
+    setUploadError(null)
+    setIsUploadingAudio(true)
+
+    try {
+      const { url } = await api.uploadAudio(file)
+      setFormData(prev => ({ ...prev, audioUrl: url }))
+
+      // Extraire automatiquement la durée du fichier audio
+      const audio = new Audio(url)
+      audio.addEventListener('loadedmetadata', () => {
+        const duration = audio.duration
+        const minutes = Math.floor(duration / 60)
+        const seconds = Math.floor(duration % 60)
+        const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`
+        setFormData(prev => ({ ...prev, duration: formattedDuration }))
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'upload audio"
+      setUploadError(`Audio : ${message}`)
+      setAudioFile(null)
+    } finally {
+      setIsUploadingAudio(false)
     }
   }
 
+  /**
+   * Sélection d'une image de couverture :
+   * Même logique : upload immédiat vers le backend.
+   */
   const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setCoverFile(file)
-      const base64 = await fileToBase64(file)
-      setFormData(p => ({ ...p, coverImage: base64 }))
+    if (!file) return
+
+    setCoverFile(file)
+    setUploadError(null)
+    setIsUploadingCover(true)
+
+    try {
+      const { url } = await api.uploadImage(file)
+      setFormData(prev => ({ ...prev, coverImage: url }))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'upload de l'image"
+      setUploadError(`Image : ${message}`)
+      setCoverFile(null)
+    } finally {
+      setIsUploadingCover(false)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title || !formData.description || !formData.speaker || !formData.duration) return
+    if (isUploadingAudio || isUploadingCover) return  // upload en cours
 
-    const podcastData = {
-      title:      formData.title,
-      description:formData.description,
-      speaker:    formData.speaker,
-      duration:   formData.duration,
-      theme:      formData.theme,
-      audioUrl:   formData.audioUrl,
-      coverImage: formData.coverImage || "/images/podcast-default.jpg",
-      date:       editingPodcast?.date ?? new Date().toISOString().split("T")[0],
-    }
+    setIsSubmitting(true)
+    setUploadError(null)
 
-    if (editingPodcast) {
-      updatePodcast(editingPodcast.id, podcastData)
-    } else {
-      addPodcast(podcastData)
+    try {
+      const podcastData = {
+        title:      formData.title,
+        description:formData.description,
+        speaker:    formData.speaker,
+        duration:   formData.duration,
+        theme:      formData.theme,
+        audioUrl:   formData.audioUrl,
+        coverImage: formData.coverImage || "/images/podcast-default.jpg",
+        date:       editingPodcast?.date ?? new Date().toISOString().split("T")[0],
+      }
+
+      if (editingPodcast) {
+        await updatePodcast(editingPodcast.id, podcastData)
+      } else {
+        await addPodcast(podcastData)
+      }
+      setIsSheetOpen(false)
+      resetForm()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erreur lors de l'enregistrement"
+      setUploadError(message)
+    } finally {
+      setIsSubmitting(false)
     }
-    setIsSheetOpen(false)
-    resetForm()
   }
 
   const handleEdit = (podcast: Podcast) => {
@@ -173,6 +243,13 @@ export default function AdminPodcastsPage() {
             <div className="flex-1 overflow-y-auto p-6 min-h-0">
               <form id="podcast-form" onSubmit={handleSubmit} className="space-y-6">
 
+                {/* Message d'erreur global */}
+                {uploadError && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
+                    {uploadError}
+                  </div>
+                )}
+
                 {/* Informations principales */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-foreground border-b pb-2">Informations principales</h3>
@@ -218,12 +295,17 @@ export default function AdminPodcastsPage() {
                   <h3 className="text-sm font-semibold text-foreground border-b pb-2">Image de couverture</h3>
                   <div className="space-y-3">
                     <div className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-4 text-center hover:border-primary/50 transition-colors bg-muted/30">
-                      <Input id="coverFile" type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleCoverFileChange} className="hidden" />
-                      <label htmlFor="coverFile" className="cursor-pointer block">
-                        {coverFile ? (
+                      <Input id="coverFile" type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleCoverFileChange} className="hidden" disabled={isUploadingCover} />
+                      <label htmlFor="coverFile" className={cn("cursor-pointer block", isUploadingCover && "opacity-60 cursor-not-allowed")}>
+                        {isUploadingCover ? (
+                          <div className="py-4 flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Upload de l&apos;image en cours...</p>
+                          </div>
+                        ) : coverFile && formData.coverImage ? (
                           <div className="flex items-center gap-4">
                             <div className="w-16 h-16 bg-background rounded-lg overflow-hidden shrink-0 shadow-sm">
-                              <img src={URL.createObjectURL(coverFile)} alt="Preview" className="w-full h-full object-cover" />
+                              <img src={formData.coverImage} alt="Preview" className="w-full h-full object-cover" />
                             </div>
                             <div className="text-left">
                               <p className="text-sm font-medium text-foreground">{coverFile.name}</p>
@@ -252,23 +334,29 @@ export default function AdminPodcastsPage() {
                   <h3 className="text-sm font-semibold text-foreground border-b pb-2">Fichier Audio</h3>
                   <div className="space-y-3">
                     <div className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-4 text-center hover:border-primary/50 transition-colors bg-muted/30">
-                      <Input id="audioFile" type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleAudioFileChange} className="hidden" />
-                      <label htmlFor="audioFile" className="cursor-pointer block">
-                        {audioFile ? (
+                      <Input id="audioFile" type="file" accept=".mp3,.wav,.m4a,.ogg" onChange={handleAudioFileChange} className="hidden" disabled={isUploadingAudio} />
+                      <label htmlFor="audioFile" className={cn("cursor-pointer block", isUploadingAudio && "opacity-60 cursor-not-allowed")}>
+                        {isUploadingAudio ? (
+                          <div className="py-4 flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Upload du fichier audio en cours...</p>
+                            <p className="text-xs text-muted-foreground/70">Cela peut prendre quelques secondes selon la taille</p>
+                          </div>
+                        ) : audioFile && formData.audioUrl ? (
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                              <Mic className="h-6 w-6 text-primary" />
+                            <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center shrink-0">
+                              <Mic className="h-6 w-6 text-green-600" />
                             </div>
                             <div className="text-left">
                               <p className="text-sm font-medium text-foreground">{audioFile.name}</p>
-                              <p className="text-xs text-muted-foreground">{(audioFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                              <p className="text-xs text-muted-foreground">{(audioFile.size / 1024 / 1024).toFixed(2)} MB · Uploadé ✓</p>
                             </div>
                           </div>
                         ) : (
                           <div className="py-4">
                             <Upload className="h-8 w-8 mx-auto text-muted-foreground/50" />
                             <p className="text-sm mt-2 text-muted-foreground">Glissez le fichier audio ou <span className="text-primary font-medium">parcourir</span></p>
-                            <p className="text-xs text-muted-foreground/70 mt-1">MP3, WAV, M4A, OGG (max 100MB)</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">MP3, WAV, M4A, OGG (max 200MB)</p>
                           </div>
                         )}
                       </label>
@@ -278,6 +366,16 @@ export default function AdminPodcastsPage() {
                       <Input id="audioUrl" value={formData.audioUrl} onChange={e => setFormData({...formData, audioUrl: e.target.value})}
                         placeholder="https://example.com/audio.mp3" className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary" />
                     </div>
+
+                    {/* Aperçu audio si une URL est disponible */}
+                    {formData.audioUrl && !formData.audioUrl.startsWith("data:") && (
+                      <div className="bg-muted/50 rounded-lg p-3">
+                        <p className="text-xs text-muted-foreground mb-2">Aperçu audio :</p>
+                        <audio controls className="w-full h-8" src={formData.audioUrl}>
+                          Votre navigateur ne supporte pas l&apos;élément audio.
+                        </audio>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -291,8 +389,17 @@ export default function AdminPodcastsPage() {
                   <span>Besoin d&apos;aide ?</span>
                   <button type="button" className="text-primary hover:underline">Cliquez ici</button>
                 </div>
-                <Button type="submit" form="podcast-form" className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6">
-                  {editingPodcast ? "Enregistrer les modifications" : "Ajouter le podcast"}
+                <Button
+                  type="submit"
+                  form="podcast-form"
+                  className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6"
+                  disabled={isUploadingAudio || isUploadingCover || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enregistrement...</>
+                  ) : isUploadingAudio || isUploadingCover ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Upload en cours...</>
+                  ) : editingPodcast ? "Enregistrer les modifications" : "Ajouter le podcast"}
                 </Button>
               </div>
             </div>
@@ -300,9 +407,8 @@ export default function AdminPodcastsPage() {
         </SheetContent>
       </Sheet>
 
-      {/* ── Stats — générées dynamiquement depuis podcastThemes ── */}
+      {/* ── Stats ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {/* Carte Total */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
@@ -317,7 +423,6 @@ export default function AdminPodcastsPage() {
           </CardContent>
         </Card>
 
-        {/* Une carte par thème */}
         {podcastThemes.map((theme) => {
           const colorMap: Record<string, { bg: string; icon: string }> = {
             foi:        { bg: 'bg-blue-500/10',    icon: 'text-blue-500'    },
@@ -364,17 +469,21 @@ export default function AdminPodcastsPage() {
             <div className="space-y-4">
               {podcasts.map((podcast) => (
                 <div key={podcast.id} className="flex items-start gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-                  {/* Pochette */}
                   <div className="w-16 h-16 rounded-lg bg-muted overflow-hidden shrink-0">
                     <div className="w-full h-full bg-cover bg-center" style={{ backgroundImage: `url(${podcast.coverImage || "/images/placeholder.jpg"})` }} />
                   </div>
 
-                  {/* Contenu */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant="outline" className={cn("text-xs", themeColors[podcast.theme])}>
                         {getThemeLabel(podcast.theme)}
                       </Badge>
+                      {/* Indicateur d'audio disponible */}
+                      {podcast.audioUrl && (
+                        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/20">
+                          Audio ✓
+                        </Badge>
+                      )}
                     </div>
                     <h3 className="font-semibold mb-2 line-clamp-1">{podcast.title}</h3>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -383,7 +492,6 @@ export default function AdminPodcastsPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(podcast)} className="h-8 w-8 hover:bg-primary/10">
                       <Pencil className="h-4 w-4" />

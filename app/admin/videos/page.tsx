@@ -82,9 +82,15 @@ export default function AdminVideosPage() {
     }
   }
 
+  const isFormValid =
+    formData.title.trim().length > 0 &&
+    formData.description.trim().length > 0 &&
+    formData.speaker.trim().length > 0 &&
+    formData.youtubeUrl.trim().length > 0
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title || !formData.description || !formData.speaker || !formData.youtubeUrl) return
+    if (!isFormValid) return
 
     const videoData = {
       title:      formData.title,
@@ -248,7 +254,7 @@ export default function AdminVideosPage() {
                   <span>Besoin d&apos;aide ?</span>
                   <button type="button" className="text-primary hover:underline">Cliquez ici</button>
                 </div>
-                <Button type="submit" form="video-form" className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6">
+                <Button type="submit" form="video-form" disabled={!isFormValid} className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6 disabled:opacity-50 disabled:cursor-not-allowed">
                   {editingVideo ? "Enregistrer les modifications" : "Ajouter la vidéo"}
                 </Button>
               </div>

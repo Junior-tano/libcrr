@@ -109,9 +109,16 @@ export default function AdminProgramsPage() {
     }
   }
 
+  const isFormValid =
+    formData.title.trim().length > 0 &&
+    formData.description.trim().length > 0 &&
+    formData.date.trim().length > 0 &&
+    formData.time.trim().length > 0 &&
+    formData.location.trim().length > 0
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title || !formData.description || !formData.date || !formData.time || !formData.location) return
+    if (!isFormValid) return
 
     const programData = {
       title: formData.title,
@@ -418,7 +425,8 @@ export default function AdminProgramsPage() {
                 <Button
                   type="submit"
                   form="program-form"
-                  className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6"
+                  disabled={!isFormValid}
+                  className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingProgram ? "Enregistrer les modifications" : "Ajouter le programme"}
                 </Button>

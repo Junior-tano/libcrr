@@ -67,7 +67,7 @@ export function AudioPlayer({ audioUrl, title }: AudioPlayerProps) {
     if (isMuted) {
       audioRef.current.volume = volume || 1
       setIsMuted(false)
-    } else {
+    } else {resolve
       audioRef.current.volume = 0
       setIsMuted(true)
     }

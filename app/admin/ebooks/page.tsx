@@ -73,8 +73,15 @@ export default function AdminEbooksPage() {
     if (file) { setCoverFile(file); const b64 = await fileToBase64(file); setFormData(p => ({ ...p, coverImage: b64 })) }
   }
 
+  const isFormValid =
+    formData.title.trim().length > 0 &&
+    formData.description.trim().length > 0 &&
+    formData.author.trim().length > 0 &&
+    (formData.isFree || (formData.price as string).toString().trim().length > 0)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isFormValid) return
     const price = formData.isFree ? 0 : parseFloat(formData.price as string) || 0
 
     const ebookData = {
@@ -276,7 +283,7 @@ export default function AdminEbooksPage() {
                   <span>Besoin d&apos;aide ?</span>
                   <button type="button" className="text-primary hover:underline">Cliquez ici</button>
                 </div>
-                <Button type="submit" form="ebook-form" className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6">
+                <Button type="submit" form="ebook-form" disabled={!isFormValid} className="bg-[#E07A5F] hover:bg-[#E07A5F]/90 text-white px-6 disabled:opacity-50 disabled:cursor-not-allowed">
                   {editingEbook ? "Enregistrer les modifications" : "Ajouter l'e-book"}
                 </Button>
               </div>

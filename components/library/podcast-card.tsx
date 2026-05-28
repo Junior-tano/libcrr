@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import type { Podcast } from "@/lib/types"
-import { Download, Share2, Mic, Play, Pause, Volume2, VolumeX, X } from "lucide-react"
+import { Download, Share2, Mic, Play, Pause, Volume2, VolumeX, X, Clock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuthModal } from "@/components/library/auth-modal"
@@ -156,19 +156,23 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
         <div>
           <h3 className="font-medium text-sm leading-tight line-clamp-1">{podcast.title}</h3>
           <p className="text-xs text-primary">{podcast.speaker}</p>
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+            <Clock className="h-3 w-3" />
+            {podcast.duration}
+          </p>
         </div>
         
         {/* Audio Player Section */}
         {showPlayer && (
-          <div className="bg-muted/60 rounded-lg p-2.5 space-y-2">
-            <audio ref={audioRef} src={podcast.audioUrl} preload="metadata" />
-            
+          <div className="bg-muted/60 rounded-lg p-3 space-y-2">
+            <audio ref={audioRef} src={resolvedUrl} preload="metadata" />
+
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
                 size="icon"
                 onClick={togglePlay}
-                className="h-8 w-8 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
+                className="h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
               >
                 {isPlaying ? (
                   <Pause className="h-4 w-4" />
@@ -177,13 +181,13 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
                 )}
               </Button>
 
-              <div className="flex-1 space-y-0.5">
+              <div className="flex-1 space-y-1 min-w-0">
                 <Slider
                   value={[currentTime]}
                   max={duration || 100}
                   step={1}
                   onValueChange={handleSeek}
-                  className="cursor-pointer"
+                  className="cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4"
                 />
                 <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
                   <span>{formatTime(currentTime)}</span>
@@ -195,12 +199,12 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
                 variant="ghost"
                 size="icon"
                 onClick={toggleMute}
-                className="h-6 w-6 shrink-0"
+                className="h-7 w-7 shrink-0"
               >
                 {isMuted ? (
-                  <VolumeX className="h-3 w-3" />
+                  <VolumeX className="h-3.5 w-3.5" />
                 ) : (
-                  <Volume2 className="h-3 w-3" />
+                  <Volume2 className="h-3.5 w-3.5" />
                 )}
               </Button>
 
@@ -208,9 +212,9 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
                 variant="ghost"
                 size="icon"
                 onClick={handleClosePlayer}
-                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
               >
-                <X className="h-3 w-3" />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
@@ -221,11 +225,12 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
             <Button 
               variant="default"
               size="sm"
-              className="w-full h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleListenClick}
+              disabled={!podcast.audioUrl}
             >
               <Play className="h-3 w-3 mr-1.5" />
-              Ecouter
+              {podcast.audioUrl ? "Ecouter" : "Aucun audio"}
             </Button>
           )}
           <Button 
