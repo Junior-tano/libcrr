@@ -204,11 +204,13 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
       {/* ── Infos ── */}
       <div className="px-3 pt-2.5 pb-1">
         <h3 className="font-medium text-sm leading-tight line-clamp-1 text-foreground">{podcast.title}</h3>
-        <p className="text-xs text-primary mt-0.5">{podcast.speaker}</p>
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-          <Clock className="h-2.5 w-2.5" />
-          {podcast.duration || "—"}
-        </p>
+        <div className="flex items-center justify-between gap-1 mt-0.5">
+          <p className="text-xs text-primary truncate">{podcast.speaker}</p>
+          <p className="text-[10px] text-muted-foreground flex items-center gap-0.5 shrink-0">
+            <Clock className="h-2.5 w-2.5" />
+            {podcast.duration || "—"}
+          </p>
+        </div>
       </div>
 
       {/* ── Lecteur intégré ── */}
