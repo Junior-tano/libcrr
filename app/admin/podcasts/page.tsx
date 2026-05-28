@@ -42,6 +42,7 @@ import {
 import type { Podcast } from "@/lib/types"
 import { podcastThemes } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
+import { uploadAudioFile } from "@/lib/audio-storage"
 
 const themeColors: Record<string, string> = {
   foi:        "bg-blue-500/10 text-blue-600 border-blue-500/20",
@@ -108,7 +109,10 @@ export default function AdminPodcastsPage() {
     setIsUploadingAudio(true)
 
     try {
-      const { url } = await api.uploadAudio(file)
+      // uploadAudioFile tente d'abord le backend Laravel.
+      // Si le backend est hors-ligne ou répond 413, il bascule
+      // automatiquement sur IndexedDB (stockage local).
+      const url = await uploadAudioFile(file)
       setFormData(prev => ({ ...prev, audioUrl: url }))
 
       // Extraire automatiquement la durée du fichier audio
@@ -368,12 +372,19 @@ export default function AdminPodcastsPage() {
                     </div>
 
                     {/* Aperçu audio si une URL est disponible */}
-                    {formData.audioUrl && !formData.audioUrl.startsWith("data:") && (
+                    {formData.audioUrl && !formData.audioUrl.startsWith("data:") && !formData.audioUrl.startsWith("indexeddb://") && (
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-xs text-muted-foreground mb-2">Aperçu audio :</p>
                         <audio controls className="w-full h-8" src={formData.audioUrl}>
                           Votre navigateur ne supporte pas l&apos;élément audio.
                         </audio>
+                      </div>
+                    )}
+                    {formData.audioUrl && formData.audioUrl.startsWith("indexeddb://") && (
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                        <p className="text-xs text-green-600">
+                          ✓ Fichier audio sauvegardé localement (backend non disponible). Il sera lisible sur le frontoffice de ce navigateur.
+                        </p>
                       </div>
                     )}
                   </div>
