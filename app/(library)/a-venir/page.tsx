@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useStore } from "@/lib/store"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { 
   Calendar, 
   Clock, 
@@ -18,8 +16,6 @@ import {
   Megaphone,
   Heart,
   Star,
-  Bell,
-  ArrowRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -34,44 +30,86 @@ const categoryIcons: Record<string, React.ElementType> = {
 
 const categoryLabels: Record<string, string> = {
   culte: "Culte",
-  conference: "Conference",
-  seminaire: "Seminaire",
-  evangelisation: "Evangelisation",
+  conference: "Conférence",
+  seminaire: "Séminaire",
+  evangelisation: "Évangélisation",
   jeunesse: "Jeunesse",
   autre: "Autre"
 }
 
-const categoryColors: Record<string, { badge: string; bg: string; icon: string }> = {
-  culte: { 
-    badge: "bg-blue-50 text-blue-700 border-blue-100", 
-    bg: "bg-blue-50", 
-    icon: "text-blue-600" 
-  },
-  conference: { 
-    badge: "bg-purple-50 text-purple-700 border-purple-100", 
-    bg: "bg-purple-50", 
-    icon: "text-purple-600" 
-  },
-  seminaire: { 
-    badge: "bg-amber-50 text-amber-700 border-amber-100", 
-    bg: "bg-amber-50", 
-    icon: "text-amber-600" 
-  },
-  evangelisation: { 
-    badge: "bg-rose-50 text-rose-700 border-rose-100", 
-    bg: "bg-rose-50", 
-    icon: "text-rose-600" 
-  },
-  jeunesse: { 
-    badge: "bg-emerald-50 text-emerald-700 border-emerald-100", 
-    bg: "bg-emerald-50", 
-    icon: "text-emerald-600" 
-  },
-  autre: { 
-    badge: "bg-gray-50 text-gray-700 border-gray-100", 
-    bg: "bg-gray-50", 
-    icon: "text-gray-600" 
+interface TimeLeft {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+}
+
+function useCountdown(targetDate: string): TimeLeft | null {
+  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null)
+
+  useEffect(() => {
+    const calculate = () => {
+      const target = new Date(targetDate).getTime()
+      const now = Date.now()
+      const diff = target - now
+
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / 1000 / 60) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      })
+    }
+
+    calculate()
+    const timer = setInterval(calculate, 1000)
+    return () => clearInterval(timer)
+  }, [targetDate])
+
+  return timeLeft
+}
+
+function CountdownDisplay({ dateString }: { dateString: string }) {
+  const timeLeft = useCountdown(dateString)
+
+  if (!timeLeft) return null
+
+  const units = [
+    { label: "JOURS", value: timeLeft.days },
+    { label: "HEURES", value: timeLeft.hours },
+    { label: "MINUTES", value: timeLeft.minutes },
+    { label: "SECONDES", value: timeLeft.seconds },
+  ]
+
+  const isOver = timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0
+  
+  if (isOver) {
+    return (
+      <div className="flex items-center justify-center gap-3 mt-6">
+        <span className="text-white/80 text-lg font-medium tracking-widest uppercase">Événement en cours</span>
+      </div>
+    )
   }
+
+  return (
+    <div className="flex items-center justify-center gap-4 md:gap-8 mt-6">
+      {units.map(({ label, value }) => (
+        <div key={label} className="flex flex-col items-center">
+          <span className="text-4xl md:text-6xl font-black text-[#e8732a] tabular-nums leading-none">
+            {String(value).padStart(2, "0")}
+          </span>
+          <span className="text-[10px] md:text-xs font-semibold text-white/50 tracking-[0.2em] mt-1">
+            {label}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function UpcomingProgramsPage() {
@@ -79,7 +117,6 @@ export default function UpcomingProgramsPage() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isAutoPlaying, setIsAutoPlaying] = useState(true)
   
-  // Sort programs by date
   const sortedPrograms = [...upcomingPrograms].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   )
@@ -92,45 +129,38 @@ export default function UpcomingProgramsPage() {
     setCurrentSlide((prev) => (prev - 1 + sortedPrograms.length) % sortedPrograms.length)
   }, [sortedPrograms.length])
   
-  // Auto-slide every 8 seconds
   useEffect(() => {
     if (!isAutoPlaying || sortedPrograms.length <= 1) return
-    
-    const interval = setInterval(() => {
-      nextSlide()
-    }, 8000)
-    
+    const interval = setInterval(nextSlide, 10000)
     return () => clearInterval(interval)
   }, [isAutoPlaying, nextSlide, sortedPrograms.length])
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('fr-FR', { 
-      weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric'
-    })
-  }
-
-  const formatShortDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return {
-      day: date.getDate().toString().padStart(2, '0'),
-      month: date.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase()
-    }
+    }).toUpperCase()
   }
   
   if (sortedPrograms.length === 0) {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50 flex items-center justify-center">
-            <Calendar className="h-10 w-10 text-muted-foreground/50" />
+      <div 
+        className="min-h-screen flex items-center justify-center relative overflow-hidden"
+        style={{ background: "linear-gradient(135deg, #0f0c0c 0%, #1a1010 50%, #0a0a0a 100%)" }}
+      >
+        <div className="absolute inset-0 opacity-5" style={{
+          backgroundImage: "radial-gradient(circle at 2px 2px, #e8732a 1px, transparent 0)",
+          backgroundSize: "40px 40px"
+        }} />
+        <div className="relative text-center max-w-md mx-auto px-4">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-full border-2 border-[#e8732a]/30 flex items-center justify-center">
+            <Calendar className="h-9 w-9 text-[#e8732a]/60" />
           </div>
-          <h1 className="text-2xl font-semibold text-foreground mb-3">Aucun programme a venir</h1>
-          <p className="text-muted-foreground leading-relaxed">
-            Revenez bientot pour decouvrir nos prochains evenements spirituels et temps de communion.
+          <h1 className="text-3xl font-black text-white mb-3">Aucun programme à venir</h1>
+          <p className="text-white/50 leading-relaxed">
+            Revenez bientôt pour découvrir nos prochains événements.
           </p>
         </div>
       </div>
@@ -139,308 +169,153 @@ export default function UpcomingProgramsPage() {
   
   const currentProgram = sortedPrograms[currentSlide]
   const CategoryIcon = categoryIcons[currentProgram.category]
-  const colors = categoryColors[currentProgram.category]
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pb-8 pt-6 lg:pt-10 lg:pb-12">
-        {/* Soft gradient background */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-gradient-to-br from-primary/8 via-primary/4 to-transparent rounded-full blur-3xl" />
-          <div className="absolute top-1/4 -right-1/4 w-[500px] h-[500px] bg-gradient-to-bl from-secondary/10 to-transparent rounded-full blur-3xl" />
-        </div>
+    <div className="min-h-screen">
+      {/* HERO — Conference-style full-screen */}
+      <section 
+        className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden"
+        onMouseEnter={() => setIsAutoPlaying(false)}
+        onMouseLeave={() => setIsAutoPlaying(true)}
+      >
+        {/* Background image */}
+        {currentProgram.image && (
+          <div
+            className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
+            style={{ backgroundImage: `url(${currentProgram.image})` }}
+          />
+        )}
         
-        <div className="container mx-auto px-4 relative">
-          {/* Header */}
-          <div className="text-center mb-10 lg:mb-14">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/5 border border-primary/10 text-primary mb-5">
-              <Bell className="h-4 w-4" />
-              <span className="text-sm font-medium">Programmes a Venir</span>
-            </div>
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground mb-4 text-balance">
-              Rejoignez-nous pour nos
-              <br />
-              <span className="text-primary">prochains evenements</span>
-            </h1>
-            <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-              Cultes, conferences, seminaires et moments de communion fraternelle vous attendent.
-            </p>
-          </div>
+        {/* Dark overlay with brand gradient */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            background: currentProgram.image
+              ? "linear-gradient(to bottom, rgba(10,5,5,0.75) 0%, rgba(10,5,5,0.65) 50%, rgba(10,5,5,0.85) 100%)"
+              : "linear-gradient(135deg, #0f0c0c 0%, #1a1010 50%, #0a0a0a 100%)"
+          }}
+        />
+
+        {/* Dot grid texture */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{
+          backgroundImage: "radial-gradient(circle at 2px 2px, #e8732a 1px, transparent 0)",
+          backgroundSize: "32px 32px"
+        }} />
+
+        {/* Decorative shapes */}
+        <div className="absolute top-20 left-8 w-0 h-0 opacity-40" style={{
+          borderLeft: "30px solid transparent",
+          borderRight: "30px solid transparent",
+          borderBottom: "52px solid #e8732a"
+        }} />
+        <div className="absolute bottom-28 right-10 w-0 h-0 opacity-20" style={{
+          borderLeft: "18px solid transparent",
+          borderRight: "18px solid transparent",
+          borderBottom: "32px solid #e8732a"
+        }} />
+        <div className="absolute top-1/3 right-16 w-12 h-12 border-2 border-[#e8732a]/30 rotate-45 opacity-40" />
+
+        {/* Content */}
+        <div className="relative z-10 text-center max-w-4xl mx-auto px-6 py-24">
           
-          {/* Featured Event Card */}
-          <div 
-            className="relative max-w-5xl mx-auto"
-            onMouseEnter={() => setIsAutoPlaying(false)}
-            onMouseLeave={() => setIsAutoPlaying(true)}
-          >
-            <Card className="overflow-hidden border-0 shadow-xl shadow-primary/5 bg-card">
-              <CardContent className="p-0">
-                <div className="grid lg:grid-cols-5">
-                  {/* Image Side - 3 columns */}
-                  <div className="relative h-[280px] lg:h-[420px] lg:col-span-3 overflow-hidden">
-                    <div 
-                      className="absolute inset-0 bg-cover bg-center transition-all duration-700 ease-out scale-105"
-                      style={{ 
-                        backgroundImage: `url(${currentProgram.image || '/images/placeholder-event.jpg'})`,
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-transparent lg:bg-gradient-to-t lg:from-black/60 lg:via-black/20 lg:to-transparent" />
-                    
-                    {/* Category Badge */}
-                    <div className="absolute top-5 left-5">
-                      <Badge 
-                        variant="outline" 
-                        className={cn(
-                          "px-3 py-1.5 text-xs font-medium bg-white/95 backdrop-blur-sm border-0 shadow-sm",
-                          colors.badge
-                        )}
-                      >
-                        <CategoryIcon className="h-3.5 w-3.5 mr-1.5" />
-                        {categoryLabels[currentProgram.category]}
-                      </Badge>
-                    </div>
-                    
-                    {/* Date Badge - Mobile */}
-                    <div className="absolute bottom-5 left-5 lg:hidden">
-                      <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-sm text-center">
-                        <p className="text-2xl font-bold text-foreground leading-none">{formatShortDate(currentProgram.date).day}</p>
-                        <p className="text-xs font-medium text-muted-foreground mt-0.5">{formatShortDate(currentProgram.date).month}</p>
-                      </div>
-                    </div>
+          {/* Date badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 border border-[#e8732a]/50 bg-[#e8732a]/10 rounded-sm">
+            <Calendar className="h-3.5 w-3.5 text-[#e8732a]" />
+            <span className="text-[#e8732a] text-xs font-bold tracking-[0.2em] uppercase">
+              {formatDate(currentProgram.date)}
+            </span>
+            {currentProgram.time && (
+              <>
+                <span className="text-[#e8732a]/40 mx-1">|</span>
+                <span className="text-[#e8732a] text-xs font-bold tracking-[0.1em]">EN LIGNE</span>
+              </>
+            )}
+          </div>
 
-                    {/* Navigation Arrows - Desktop */}
-                    {sortedPrograms.length > 1 && (
-                      <div className="hidden lg:flex absolute bottom-5 right-5 gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm border-0 shadow-sm hover:bg-white"
-                          onClick={prevSlide}
-                        >
-                          <ChevronLeft className="h-5 w-5" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10 rounded-full bg-white/90 backdrop-blur-sm border-0 shadow-sm hover:bg-white"
-                          onClick={nextSlide}
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Content Side - 2 columns */}
-                  <div className="p-6 lg:p-8 lg:col-span-2 flex flex-col justify-center">
-                    {/* Date Badge - Desktop */}
-                    <div className="hidden lg:flex items-center gap-4 mb-5">
-                      <div className={cn("rounded-xl px-4 py-3 text-center", colors.bg)}>
-                        <p className="text-2xl font-bold text-foreground leading-none">{formatShortDate(currentProgram.date).day}</p>
-                        <p className={cn("text-xs font-medium mt-0.5", colors.icon)}>{formatShortDate(currentProgram.date).month}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Evenement a venir</p>
-                        <p className="text-sm font-medium text-foreground capitalize">{formatDate(currentProgram.date).split(',')[0]}</p>
-                      </div>
-                    </div>
-                    
-                    {/* Title */}
-                    <h2 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-3 text-balance">
-                      {currentProgram.title}
-                    </h2>
-                    
-                    {/* Description */}
-                    <p className="text-muted-foreground text-sm leading-relaxed mb-5 line-clamp-3">
-                      {currentProgram.description}
-                    </p>
-                    
-                    {/* Meta Information */}
-                    <div className="space-y-3 mb-6">
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", colors.bg)}>
-                          <Clock className={cn("h-4 w-4", colors.icon)} />
-                        </div>
-                        <span className="text-foreground font-medium">{currentProgram.time}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", colors.bg)}>
-                          <MapPin className={cn("h-4 w-4", colors.icon)} />
-                        </div>
-                        <span className="text-foreground font-medium line-clamp-1">{currentProgram.location}</span>
-                      </div>
-                      
-                      {currentProgram.speaker && (
-                        <div className="flex items-center gap-3 text-sm">
-                          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", colors.bg)}>
-                            <User className={cn("h-4 w-4", colors.icon)} />
-                          </div>
-                          <span className="text-foreground font-medium">{currentProgram.speaker}</span>
-                        </div>
-                      )}
-                    </div>
+          {/* Category */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <CategoryIcon className="h-4 w-4 text-white/40" />
+            <span className="text-white/40 text-xs font-semibold tracking-[0.3em] uppercase">
+              {categoryLabels[currentProgram.category]}
+            </span>
+          </div>
 
-                    {/* Slide Indicators */}
-                    {sortedPrograms.length > 1 && (
-                      <div className="flex items-center gap-1.5">
-                        {sortedPrograms.map((_, index) => (
-                          <button
-                            key={index}
-                            onClick={() => setCurrentSlide(index)}
-                            className={cn(
-                              "h-1.5 rounded-full transition-all duration-300",
-                              index === currentSlide 
-                                ? "w-6 bg-primary" 
-                                : "w-1.5 bg-muted-foreground/20 hover:bg-muted-foreground/40"
-                            )}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Title */}
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white leading-[1.05] mb-3 tracking-tight">
+            {currentProgram.title}
+          </h1>
 
-            {/* Mobile Navigation */}
-            {sortedPrograms.length > 1 && (
-              <div className="flex lg:hidden justify-center gap-3 mt-4">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 rounded-full"
-                  onClick={prevSlide}
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 rounded-full"
-                  onClick={nextSlide}
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
+          {/* Description */}
+          {currentProgram.description && (
+            <p className="text-white/60 text-base md:text-lg max-w-2xl mx-auto mt-4 leading-relaxed line-clamp-2">
+              {currentProgram.description}
+            </p>
+          )}
+
+          {/* Countdown */}
+          <CountdownDisplay dateString={currentProgram.date} />
+
+          {/* Meta */}
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-8 text-white/50 text-sm">
+            {currentProgram.time && (
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>{currentProgram.time}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              <span>{currentProgram.location}</span>
+            </div>
+            {currentProgram.speaker && (
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>{currentProgram.speaker}</span>
               </div>
             )}
           </div>
+
         </div>
-      </section>
-      
-      {/* All Programs Section */}
-      <section className="py-12 lg:py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-xl lg:text-2xl font-bold text-foreground">Tous les evenements</h2>
-              <p className="text-sm text-muted-foreground mt-1">Decouvrez notre calendrier complet</p>
-            </div>
-            <Badge variant="secondary" className="hidden sm:flex">
-              {sortedPrograms.length} evenement{sortedPrograms.length > 1 ? 's' : ''}
-            </Badge>
-          </div>
-          
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {sortedPrograms.map((program, index) => {
-              const ProgramIcon = categoryIcons[program.category]
-              const programColors = categoryColors[program.category]
-              const dateInfo = formatShortDate(program.date)
-              
-              return (
-                <Card 
-                  key={program.id}
-                  className={cn(
-                    "overflow-hidden group cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border-0 shadow-sm",
-                    index === currentSlide && "ring-2 ring-primary ring-offset-2"
-                  )}
+
+        {/* Slide navigation */}
+        {sortedPrograms.length > 1 && (
+          <>
+            {/* Prev/Next arrows */}
+            <button
+              onClick={prevSlide}
+              className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center border border-white/20 bg-black/30 text-white hover:bg-[#e8732a] hover:border-[#e8732a] transition-all duration-200"
+              aria-label="Programme précédent"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              onClick={nextSlide}
+              className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center border border-white/20 bg-black/30 text-white hover:bg-[#e8732a] hover:border-[#e8732a] transition-all duration-200"
+              aria-label="Programme suivant"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+
+            {/* Dot indicators */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+              {sortedPrograms.map((_, index) => (
+                <button
+                  key={index}
                   onClick={() => setCurrentSlide(index)}
-                >
-                  {/* Image */}
-                  <div className="relative h-40 overflow-hidden">
-                    <div 
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                      style={{ 
-                        backgroundImage: `url(${program.image || '/images/placeholder-event.jpg'})`,
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    
-                    {/* Category Badge */}
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "absolute top-3 left-3 text-[10px] font-medium bg-white/95 backdrop-blur-sm border-0",
-                        programColors.badge
-                      )}
-                    >
-                      <ProgramIcon className="h-3 w-3 mr-1" />
-                      {categoryLabels[program.category]}
-                    </Badge>
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    index === currentSlide 
+                      ? "w-8 bg-[#e8732a]" 
+                      : "w-2 bg-white/30 hover:bg-white/50"
+                  )}
+                  aria-label={`Aller au programme ${index + 1}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
-                    {/* Date Badge */}
-                    <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-center shadow-sm">
-                      <p className="text-lg font-bold text-foreground leading-none">{dateInfo.day}</p>
-                      <p className="text-[10px] font-medium text-muted-foreground">{dateInfo.month}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Content */}
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-                      {program.title}
-                    </h3>
-                    
-                    <div className="space-y-1.5 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3.5 w-3.5 shrink-0" />
-                        <span>{program.time}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="line-clamp-1">{program.location}</span>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <button className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                        Voir les details
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-12 lg:py-16">
-        <div className="container mx-auto px-4">
-          <Card className="border-0 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent overflow-hidden">
-            <CardContent className="p-8 lg:p-12">
-              <div className="max-w-2xl mx-auto text-center">
-                <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Church className="h-7 w-7 text-primary" />
-                </div>
-                <h3 className="text-xl lg:text-2xl font-bold text-foreground mb-3 text-balance">
-                  Restez informe de nos activites
-                </h3>
-                <p className="text-muted-foreground mb-6 leading-relaxed">
-                  Rejoignez notre communaute et ne manquez aucun evenement. 
-                  Nous serons ravis de vous accueillir.
-                </p>
-                <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Nous contacter
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </section>
     </div>
   )
