@@ -116,13 +116,17 @@ export default function AdminPodcastsPage() {
       setFormData(prev => ({ ...prev, audioUrl: url }))
 
       // Extraire automatiquement la durée du fichier audio
-      const audio = new Audio(url)
+      // Pour indexeddb://, on doit d'abord convertir en blob://
+      const { getAudioBlobUrl: resolveBlobUrl, isLocalAudio } = await import('@/lib/audio-storage')
+      const playableUrl = isLocalAudio(url) ? await resolveBlobUrl(url) : url
+      const audio = new Audio(playableUrl)
       audio.addEventListener('loadedmetadata', () => {
-        const duration = audio.duration
-        const minutes = Math.floor(duration / 60)
-        const seconds = Math.floor(duration % 60)
-        const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`
-        setFormData(prev => ({ ...prev, duration: formattedDuration }))
+        const secs = audio.duration
+        if (!isNaN(secs) && isFinite(secs)) {
+          const minutes = Math.floor(secs / 60)
+          const seconds = Math.floor(secs % 60)
+          setFormData(prev => ({ ...prev, duration: `${minutes}:${seconds.toString().padStart(2, '0')}` }))
+        }
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erreur lors de l'upload audio"
@@ -159,7 +163,7 @@ export default function AdminPodcastsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.title || !formData.description || !formData.speaker || !formData.duration) return
+    if (!formData.title || !formData.description || !formData.speaker) return
     if (isUploadingAudio || isUploadingCover) return  // upload en cours
 
     setIsSubmitting(true)
@@ -277,9 +281,14 @@ export default function AdminPodcastsPage() {
                         placeholder="Nom de l'orateur" className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary" required />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="duration" className="text-sm font-medium">Durée <span className="text-destructive">*</span></Label>
+                      <Label htmlFor="duration" className="text-sm font-medium flex items-center gap-1.5">
+                        Durée
+                        {formData.audioUrl && formData.duration && (
+                          <span className="text-[10px] font-normal text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded-full">auto ✓</span>
+                        )}
+                      </Label>
                       <Input id="duration" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})}
-                        placeholder="45:30" className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary" required />
+                        placeholder="Rempli automatiquement au chargement" className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary" />
                     </div>
                   </div>
 
@@ -383,7 +392,7 @@ export default function AdminPodcastsPage() {
                     {formData.audioUrl && formData.audioUrl.startsWith("indexeddb://") && (
                       <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
                         <p className="text-xs text-green-600">
-                          ✓ Fichier audio sauvegardé localement (backend non disponible). Il sera lisible sur le frontoffice de ce navigateur.
+                          Fichier audio sauvegardé. Il sera lisible sur le frontoffice de ce navigateur.
                         </p>
                       </div>
                     )}
