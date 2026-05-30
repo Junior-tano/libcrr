@@ -49,6 +49,61 @@ const categoryColors: Record<string, string> = {
   culte_dimanche:  "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
 }
 
+/**
+ * Convertit n'importe quel lien YouTube en URL embed propre.
+ * Accepte :
+ *  - https://www.youtube.com/watch?v=VIDEO_ID
+ *  - https://youtu.be/VIDEO_ID
+ *  - https://www.youtube.com/embed/VIDEO_ID  (déjà bon)
+ *  - https://youtube.com/shorts/VIDEO_ID
+ * Retourne null si le lien n'est pas reconnu.
+ */
+function normalizeYoutubeUrl(input: string): string | null {
+  const raw = input.trim()
+  if (!raw) return null
+
+  try {
+    const u = new URL(raw)
+
+    // Déjà en format embed → on nettoie juste les params inutiles
+    if (u.pathname.startsWith("/embed/")) {
+      const id = u.pathname.split("/embed/")[1]?.split("/")[0]
+      if (id) return `https://www.youtube.com/embed/${id}`
+    }
+
+    // youtu.be/VIDEO_ID
+    if (u.hostname === "youtu.be") {
+      const id = u.pathname.replace("/", "").split("?")[0]
+      if (id) return `https://www.youtube.com/embed/${id}`
+    }
+
+    if (u.hostname.includes("youtube.com")) {
+      // Shorts
+      const shortsMatch = u.pathname.match(/\/shorts\/([^/?]+)/)
+      if (shortsMatch) return `https://www.youtube.com/embed/${shortsMatch[1]}`
+
+      // Watch classique
+      const videoId = u.searchParams.get("v")
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`
+    }
+  } catch {
+    // URL invalide
+  }
+
+  return null
+}
+
+/** Retourne true si le texte ressemble à un lien YouTube (n'importe quel format) */
+function isValidYoutubeInput(input: string): boolean {
+  if (!input.trim()) return false
+  return (
+    input.includes("youtube.com/watch") ||
+    input.includes("youtu.be/") ||
+    input.includes("youtube.com/embed/") ||
+    input.includes("youtube.com/shorts/")
+  )
+}
+
 export default function AdminVideosPage() {
   const { videos, addVideo, updateVideo, deleteVideo } = useStore()
 
@@ -82,22 +137,30 @@ export default function AdminVideosPage() {
     }
   }
 
+  // Le lien YouTube est valide s'il est reconnu (n'importe quel format)
+  const youtubeInputValid =
+    formData.youtubeUrl.trim().length > 0 &&
+    isValidYoutubeInput(formData.youtubeUrl)
+
   const isFormValid =
     formData.title.trim().length > 0 &&
     formData.description.trim().length > 0 &&
     formData.speaker.trim().length > 0 &&
-    formData.youtubeUrl.trim().length > 0
+    youtubeInputValid
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!isFormValid) return
+
+    // On normalise automatiquement le lien YouTube avant sauvegarde
+    const embedUrl = normalizeYoutubeUrl(formData.youtubeUrl) ?? formData.youtubeUrl
 
     const videoData = {
       title:      formData.title,
       description:formData.description,
       speaker:    formData.speaker,
       category:   formData.category,
-      youtubeUrl: formData.youtubeUrl,
+      youtubeUrl: embedUrl,
       thumbnail:  formData.thumbnail || "/images/video-default.jpg",
       date:       editingVideo?.date ?? new Date().toISOString().split("T")[0],
     }
@@ -201,12 +264,46 @@ export default function AdminVideosPage() {
 
                 {/* Source YouTube */}
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-foreground border-b pb-2">Source Vidéo (YouTube)</h3>
+                  <h3 className="text-sm font-semibold text-foreground border-b pb-2">
+                    <span className="flex items-center gap-2">
+                      <Youtube className="h-4 w-4 text-red-500" />
+                      Source Vidéo (YouTube)
+                    </span>
+                  </h3>
                   <div className="space-y-2">
-                    <Label htmlFor="youtubeUrl" className="text-sm font-medium">URL YouTube Embed <span className="text-destructive">*</span></Label>
-                    <Input id="youtubeUrl" value={formData.youtubeUrl} onChange={e => setFormData({...formData, youtubeUrl: e.target.value})}
-                      placeholder="https://www.youtube.com/embed/VIDEO_ID" className="bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary" required />
-                    <p className="text-xs text-muted-foreground">Utilisez le format embed : https://www.youtube.com/embed/VIDEO_ID</p>
+                    <Label htmlFor="youtubeUrl" className="text-sm font-medium">
+                      Lien YouTube <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="youtubeUrl"
+                      value={formData.youtubeUrl}
+                      onChange={e => setFormData({...formData, youtubeUrl: e.target.value})}
+                      placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
+                      className={cn(
+                        "bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary",
+                        formData.youtubeUrl.trim().length > 0 && !youtubeInputValid && "ring-1 ring-destructive"
+                      )}
+                      required
+                    />
+                    {/* Message d'aide dynamique */}
+                    {formData.youtubeUrl.trim().length > 0 && !youtubeInputValid ? (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        ⚠ Lien YouTube non reconnu. Vérifiez le format ci-dessous.
+                      </p>
+                    ) : formData.youtubeUrl.trim().length > 0 && youtubeInputValid ? (
+                      <p className="text-xs text-emerald-600 flex items-center gap-1">
+                        ✓ Lien YouTube valide — il sera converti automatiquement.
+                      </p>
+                    ) : null}
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground">Formats acceptés :</p>
+                      <ul className="text-xs text-muted-foreground space-y-0.5">
+                        <li>• <span className="font-mono">https://www.youtube.com/watch?v=VIDEO_ID</span></li>
+                        <li>• <span className="font-mono">https://youtu.be/VIDEO_ID</span></li>
+                        <li>• <span className="font-mono">https://www.youtube.com/embed/VIDEO_ID</span></li>
+                        <li>• <span className="font-mono">https://youtube.com/shorts/VIDEO_ID</span></li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
